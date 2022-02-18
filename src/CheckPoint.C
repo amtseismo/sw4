@@ -15,6 +15,10 @@
 #include "H5Zzfp_props.h"
 #endif
 
+#ifdef USE_SZ
+#include "H5Z_SZ.h"
+#endif
+
 CheckPoint* CheckPoint::nil = static_cast<CheckPoint*>(0);
 
 //-----------------------------------------------------------------------
@@ -806,7 +810,7 @@ std::string CheckPoint::get_restart_path() {
 void CheckPoint::set_checkpoint_file(string fname, int cycle, int cycleInterval,
                                      size_t bufsize, bool useHDF5,
                                      int compressionMode,
-                                     double compressionPar) {
+                                     char* compressionPar) {
   mCheckPointFile = fname;
   mWritingCycle = cycle;
   mCycleInterval = cycleInterval;
@@ -1018,15 +1022,15 @@ void CheckPoint::read_header_hdf5(hid_t fid, float_sw4& a_time, int& a_cycle) {
 
 void CheckPoint::finalize_hdf5() {
 #ifdef USE_HDF5_ASYNC
-  size_t num_in_progress;
-  hbool_t op_failed;
-  int ret;
   if (m_es_id > 0) {
-    ret = H5ESwait(m_es_id, H5ES_WAIT_FOREVER, &num_in_progress, &op_failed);
+    size_t num_in_progress;
+    hbool_t op_failed;
+    int ret = H5ESwait(m_es_id, H5ES_WAIT_FOREVER, &num_in_progress, &op_failed);
     if (ret < 0) fprintf(stderr, "Error with H5ESwait!\n");
     H5ESclose(m_es_id);
     m_es_id = 0;
   }
+
 #endif
   return;
 }
@@ -1049,6 +1053,7 @@ void CheckPoint::write_hdf5_dset(hid_t fid, char* dset_name, hid_t dtype,
                                  hid_t mspace, hid_t mydspace, hid_t dxpl,
                                  void* buf) {
   hid_t dset;
+
 #ifdef USE_HDF5_ASYNC
   dset = H5Dopen_async(fid, dset_name, H5P_DEFAULT, m_es_id);
   H5Dwrite_async(dset, dtype, mspace, mydspace, dxpl, buf, m_es_id);
@@ -1058,6 +1063,7 @@ void CheckPoint::write_hdf5_dset(hid_t fid, char* dset_name, hid_t dtype,
   H5Dwrite(dset, dtype, mspace, mydspace, dxpl, buf);
   H5Dclose(dset);
 #endif
+  return;
 }
 
 //-----------------------------------------------------------------------
@@ -1079,7 +1085,7 @@ void CheckPoint::write_checkpoint_hdf5(float_sw4 a_time, int a_cycle,
   // second last.
   cycle_checkpoints(s.str());
 
-  hid_t fid, fapl, dxpl, dspace, mspace, mydspace, dtype, dcpl;
+  hid_t fid, fapl, fapl_sync, dxpl, dspace, mspace, mydspace, dtype, dcpl;
   int myrank, nrank;
   double stime, etime;
   hsize_t my_chunk[1];
@@ -1089,9 +1095,8 @@ void CheckPoint::write_checkpoint_hdf5(float_sw4 a_time, int a_cycle,
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nrank);
   if (myrank == 0)
-    std::cout << "Writing checkpoint to file " << s.str() << std::endl;
+    std::cout << "Rank " << myrank << ": Writing checkpoint to file " << s.str() << std::endl;
 
-  fapl = H5Pcreate(H5P_FILE_ACCESS);
 #ifdef USE_HDF5_ASYNC
   if (m_es_id > 0) finalize_hdf5();
 #endif
@@ -1115,45 +1120,30 @@ void CheckPoint::write_checkpoint_hdf5(float_sw4 a_time, int a_cycle,
   if (mCompMode == SW4_SZIP) {
     H5Pset_szip(dcpl, H5_SZIP_NN_OPTION_MASK, 32);
   } else if (mCompMode == SW4_ZLIB) {
-    H5Pset_deflate(dcpl, (int)mCompPar);
+    H5Pset_deflate(dcpl, atoi(mCompPar));
   }
 #ifdef USE_ZFP
   else if (mCompMode == SW4_ZFP_MODE_RATE) {
-    H5Pset_zfp_rate(dcpl, mCompPar);
+    H5Pset_zfp_rate(dcpl, atof(mCompPar));
   } else if (mCompMode == SW4_ZFP_MODE_PRECISION) {
-    H5Pset_zfp_precision(dcpl, (unsigned int)mCompPar);
+    H5Pset_zfp_precision(dcpl, (unsigned int)atoi(mCompPar));
   } else if (mCompMode == SW4_ZFP_MODE_ACCURACY) {
-    H5Pset_zfp_accuracy(dcpl, mCompPar);
+    H5Pset_zfp_accuracy(dcpl, atof(mCompPar));
   } else if (mCompMode == SW4_ZFP_MODE_REVERSIBLE) {
     H5Pset_zfp_reversible(dcpl);
   }
 #endif
 #ifdef USE_SZ
   else if (mCompMode == SW4_SZ) {
-    size_t cd_nelmts;
-    unsigned int* cd_values = NULL;
-    int dataType = SZ_DOUBLE;
-    if (m_precision == 4) dataType = SZ_FLOAT;
-    SZ_metaDataToCdArray(&cd_nelmts, &cd_values, dataType, 0, m_cycle_dims[3],
-                         m_cycle_dims[2], m_cycle_dims[1], m_cycle_dims[0]);
-    H5Pset_filter(dcpl, H5Z_FILTER_SZ, H5Z_FLAG_MANDATORY, cd_nelmts,
-                  cd_values);
+    H5Z_SZ_Init(mCompPar);
   }
 #endif
+
 
   char dset_name[128];
   hsize_t* npts = new hsize_t[mEW->mNumberOfGrids];
   hsize_t* myoff = new hsize_t[mEW->mNumberOfGrids];
   hsize_t* total = new hsize_t[mEW->mNumberOfGrids];
-
-  // Rank 0 create everything and write metadata first
-  if (myrank == 0) {
-    fid = H5Fcreate(const_cast<char*>(s.str().c_str()), H5F_ACC_TRUNC,
-                    H5P_DEFAULT, H5P_DEFAULT);
-    CHECK_INPUT(fid > 0, "CheckPoint::write_file: Error opening: " << s.str());
-
-    write_header_hdf5(fid, a_time, a_cycle);
-  }
 
   // Workaround for summit system with spectrum MPI and HDF5 1.10.4,
   // have to create all dsets before write to avoid runtime error
@@ -1172,10 +1162,45 @@ void CheckPoint::write_checkpoint_hdf5(float_sw4 a_time, int a_cycle,
     /*         npts[g], total[g]); */
   }
 
-  // Only rank 0 creates the dataset
+  // Rank 0 create everything and write metadata first
   if (myrank == 0) {
+
+    fapl_sync = H5Pcreate(H5P_FILE_ACCESS);
+    hbool_t is_disable = true;
+    if (H5Pinsert2(fapl_sync,  "gov.lbl.async.disable.implicit", sizeof(hbool_t), 
+		   &is_disable, NULL, NULL, NULL, NULL, NULL, NULL) < 0) {
+	fprintf(stderr, "Disable hdf5 async failed!\n");
+    }
+    H5Pset(fapl_sync, "gov.lbl.async.disable.implicit", &is_disable);
+
+    fid = H5Fcreate(const_cast<char*>(s.str().c_str()), H5F_ACC_TRUNC,
+                    H5P_DEFAULT, fapl_sync);
+    CHECK_INPUT(fid > 0, "CheckPoint::write_file: Error opening: " << s.str());
+
+    write_header_hdf5(fid, a_time, a_cycle);
+
     for (int g = 0; g < mEW->mNumberOfGrids; g++) {
       dspace = H5Screate_simple(1, &total[g], NULL);
+
+#ifdef USE_SZ
+        if (mCompMode == SW4_SZ) {
+          size_t cd_nelmts;
+          unsigned int* cd_values = NULL;
+          unsigned filter_config;
+          int dataType = SZ_DOUBLE;
+          if (!m_double) dataType = SZ_FLOAT;
+          SZ_metaDataToCdArray(&cd_nelmts, &cd_values, dataType,
+                               0, 0, 0, 0, total[g]);
+          H5Pset_filter(dcpl, H5Z_FILTER_SZ, H5Z_FLAG_MANDATORY,
+                        cd_nelmts, cd_values);
+
+          if(g == 0 && H5Zfilter_avail(H5Z_FILTER_SZ)) {
+            H5Zget_filter_info(H5Z_FILTER_SZ, &filter_config);
+            if(!(filter_config & H5Z_FILTER_CONFIG_ENCODE_ENABLED))
+              printf("Error SZ filter is NOT available!\n");
+          }
+        }
+#endif
 
       sprintf(dset_name, "Um%d", g);
       create_hdf5_dset(fid, dset_name, dtype, dspace, dcpl);
@@ -1192,11 +1217,18 @@ void CheckPoint::write_checkpoint_hdf5(float_sw4 a_time, int a_cycle,
       }
       H5Sclose(dspace);
     }
-    H5Fflush(fid, H5F_SCOPE_GLOBAL);
+    H5Pclose(fapl_sync);
     H5Fclose(fid);
   }  // end if myrank=0
 
   MPI_Barrier(MPI_COMM_WORLD);
+
+  etime = MPI_Wtime();
+
+  /* if (myrank == 0) */
+  /*   std::cout << "Writting checkpoint, create file took " << etime - stime << */
+  /*       " seconds" << std::endl; */
+
 
   fapl = H5Pcreate(H5P_FILE_ACCESS);
 
@@ -1221,6 +1253,10 @@ void CheckPoint::write_checkpoint_hdf5(float_sw4 a_time, int a_cycle,
 #else
   fid = H5Fopen(const_cast<char*>(s.str().c_str()), H5F_ACC_RDWR, fapl);
 #endif
+
+  if (myrank == 0)
+    std::cout << "Writting checkpoint, create and open file took " << etime - stime <<
+        " seconds" << std::endl;
 
   // Start write
   for (int g = 0; g < mEW->mNumberOfGrids; g++) {
@@ -1305,6 +1341,7 @@ void CheckPoint::write_checkpoint_hdf5(float_sw4 a_time, int a_cycle,
     std::cout << "Written checkpoint, " << etime - stime << " seconds"
               << std::endl;
 
+  return;
 }  // end write_checkpoint_hdf5()
 
 //-----------------------------------------------------------------------
@@ -1430,5 +1467,7 @@ void CheckPoint::read_checkpoint_hdf5(float_sw4& a_time, int& a_cycle,
   H5Pclose(fapl);
   H5Pclose(dxpl);
   H5Fclose(fid);
+
+  return;
 }
 #endif  // End USE_HDF5

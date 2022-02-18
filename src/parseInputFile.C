@@ -3534,7 +3534,7 @@ void EW::processESSI3D(char* buffer) {
   const float_sw4 zero = 0.0;
   int precision = 8;
   int compressionMode = 0;
-  double compressionPar;
+  char* compressionPar;
 
   // Default is whole domain
   coordBox[0] = zero;
@@ -3601,31 +3601,32 @@ void EW::processESSI3D(char* buffer) {
     } else if (startswith("zfp-rate=", token)) {
       token += 9;
       compressionMode = SW4_ZFP_MODE_RATE;
-      compressionPar = atof(token);
+      compressionPar = strdup(token);
       if (proc_zero())
         cout << "SSI ouput will use ZFP rate=" << compressionPar << endl;
     } else if (startswith("zfp-precision=", token)) {
       token += 14;
       compressionMode = SW4_ZFP_MODE_PRECISION;
-      compressionPar = atof(token);
+      compressionPar = strdup(token);
       if (proc_zero())
         cout << "SSI ouput will use ZFP precision=" << compressionPar << endl;
     } else if (startswith("zfp-accuracy=", token)) {
       token += 13;
       compressionMode = SW4_ZFP_MODE_ACCURACY;
-      compressionPar = atof(token);
+      compressionPar = strdup(token);
       if (proc_zero())
         cout << "SSI ouput will use ZFP accuracy=" << compressionPar << endl;
     } else if (startswith("zfp-reversible=", token)) {
       token += 15;
       compressionMode = SW4_ZFP_MODE_REVERSIBLE;
+      compressionPar = strdup(token);
       if (proc_zero()) cout << "SSI ouput will use ZFP reversible mode" << endl;
     } else if (startswith("zlib=", token)) {
       token += 5;
       compressionMode = SW4_ZLIB;
-      compressionPar = atof(token);
+      compressionPar = strdup(token);
       if (proc_zero())
-        cout << "SSI ouput will use ZLIB level=" << (int)compressionPar << endl;
+        cout << "SSI ouput will use ZLIB level=" << compressionPar << endl;
     } else if (startswith("szip=", token)) {
       token += 5;
       compressionMode = SW4_SZIP;
@@ -3695,7 +3696,7 @@ void EW::processCheckPoint(char* buffer) {
   string restartFileName, restartPath;
   bool restartFileGiven = false, restartPathGiven = false, useHDF5 = false;
   int compressionMode = 0;
-  double compressionPar;
+  char* compressionPar;
 
   size_t bufsize = 10000000;
 
@@ -3732,37 +3733,38 @@ void EW::processCheckPoint(char* buffer) {
     } else if (startswith("zfp-rate=", token)) {
       token += 9;
       compressionMode = SW4_ZFP_MODE_RATE;
-      compressionPar = atof(token);
+      compressionPar = strdup(token);
       useHDF5 = true;
       if (proc_zero())
         cout << "Checkpoint will use ZFP rate=" << compressionPar << endl;
     } else if (startswith("zfp-precision=", token)) {
       token += 14;
       compressionMode = SW4_ZFP_MODE_PRECISION;
-      compressionPar = atof(token);
+      compressionPar = strdup(token);
       useHDF5 = true;
       if (proc_zero())
         cout << "Checkpoint will use ZFP precision=" << compressionPar << endl;
     } else if (startswith("zfp-accuracy=", token)) {
       token += 13;
       compressionMode = SW4_ZFP_MODE_ACCURACY;
-      compressionPar = atof(token);
+      compressionPar = strdup(token);
       useHDF5 = true;
       if (proc_zero())
         cout << "Checkpoint will use ZFP accuracy=" << compressionPar << endl;
     } else if (startswith("zfp-reversible=", token)) {
       token += 15;
       compressionMode = SW4_ZFP_MODE_REVERSIBLE;
+      compressionPar = strdup(token);
       useHDF5 = true;
       if (proc_zero())
         cout << "Checkpoint will use ZFP reversible mode" << endl;
     } else if (startswith("zlib=", token)) {
       token += 5;
       compressionMode = SW4_ZLIB;
-      compressionPar = atof(token);
+      compressionPar = strdup(token);
       useHDF5 = true;
       if (proc_zero())
-        cout << "Checkpoint will use ZLIB level=" << (int)compressionPar
+        cout << "Checkpoint will use ZLIB level=" << compressionPar
              << endl;
     } else if (startswith("szip=", token)) {
       token += 5;
@@ -3772,10 +3774,11 @@ void EW::processCheckPoint(char* buffer) {
     } else if (startswith("sz=", token)) {
       token += 5;
       compressionMode = SW4_SZ;
+      compressionPar = strdup(token);
       useHDF5 = true;
       if (proc_zero())
         cout << "Checkpoint will use SZ with configuration file ["
-             << getenv("SZ_CONFIG_FILE") << "]" << endl;
+             << compressionPar << "]" << endl;
     }
 
     else if (startswith("bufsize=", token)) {

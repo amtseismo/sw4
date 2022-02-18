@@ -27,7 +27,7 @@ class CheckPoint {
   void set_restart_file(string fname, size_t bufsize);
   void set_checkpoint_file(string fname, int cycle, int cycleInterval,
                            size_t bufsize, bool useHDF5, int compressionMode,
-                           double compressionPar);
+                           char* compressionPar);
 
   void write_checkpoint(float_sw4 a_time, int a_cycle,
                         std::vector<Sarray>& a_Um, std::vector<Sarray>& a_U,
@@ -96,7 +96,7 @@ class CheckPoint {
   string mRestartPath;
   bool mUseHDF5;
   int mCompMode;
-  double mCompPar;
+  char* mCompPar;
 
  private:
   CheckPoint();  // make it impossible to call default constructor

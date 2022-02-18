@@ -315,7 +315,7 @@ void ESSI3DHDF5::write_topo(void* window_array) {
   return;
 }
 void ESSI3DHDF5::init_write_vel(bool isRestart, int ntimestep,
-                                int compressionMode, double compressionPar,
+                                int compressionMode, char *compressionPar,
                                 int bufferInterval) {
   bool debug = false;
   /* debug=true; */
@@ -389,27 +389,29 @@ void ESSI3DHDF5::init_write_vel(bool isRestart, int ntimestep,
     if (compressionMode == SW4_SZIP) {
       H5Pset_szip(prop_id, H5_SZIP_NN_OPTION_MASK, 32);
     } else if (compressionMode == SW4_ZLIB) {
-      H5Pset_deflate(prop_id, (int)compressionPar);
+      H5Pset_deflate(prop_id, atoi(compressionPar));
     }
 #ifdef USE_ZFP
     else if (compressionMode == SW4_ZFP_MODE_RATE) {
-      H5Pset_zfp_rate(prop_id, compressionPar);
+      H5Pset_zfp_rate(prop_id, atof(compressionPar));
     } else if (compressionMode == SW4_ZFP_MODE_PRECISION) {
-      H5Pset_zfp_precision(prop_id, (unsigned int)compressionPar);
+      H5Pset_zfp_precision(prop_id, (unsigned int)atoi(compressionPar));
     } else if (compressionMode == SW4_ZFP_MODE_ACCURACY) {
-      H5Pset_zfp_accuracy(prop_id, compressionPar);
+      H5Pset_zfp_accuracy(prop_id, atof(compressionPar));
     } else if (compressionMode == SW4_ZFP_MODE_REVERSIBLE) {
       H5Pset_zfp_reversible(prop_id);
     }
 #endif
 #ifdef USE_SZ
     else if (compressionMode == SW4_SZ) {
+      H5Z_SZ_Init(compressionPar);
+
       size_t cd_nelmts;
       unsigned int* cd_values = NULL;
       int dataType = SZ_DOUBLE;
       if (m_precision == 4) dataType = SZ_FLOAT;
-      SZ_metaDataToCdArray(&cd_nelmts, &cd_values, dataType, 0, m_cycle_dims[3],
-                           m_cycle_dims[2], m_cycle_dims[1], m_cycle_dims[0]);
+      SZ_metaDataToCdArray(&cd_nelmts, &cd_values, dataType, 0, m_cycle_dims[0],
+                           m_cycle_dims[1], m_cycle_dims[2], m_cycle_dims[3]);
       H5Pset_filter(prop_id, H5Z_FILTER_SZ, H5Z_FLAG_MANDATORY, cd_nelmts,
                     cd_values);
     }

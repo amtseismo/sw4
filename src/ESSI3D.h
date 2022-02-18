@@ -59,7 +59,7 @@ class ESSI3D {
 
   ESSI3D(EW* a_ew, const std::string& filePrefix, int dumpInterval,
          int bufferInterval, float_sw4 coordBox[4], float_sw4 depth,
-         int precision, int compressionMode, double compressionPar);
+         int precision, int compressionMode, char* compressionPar);
   ~ESSI3D();
 
   void set_dump_interval(int a_dumpInterval);
@@ -114,7 +114,7 @@ class ESSI3D {
   bool m_fileOpen;
 
   int m_compressionMode;
-  double m_compressionPar;
+  char* m_compressionPar;
 
   static int
       mPreceedZeros;  // number of digits for unique time step in file names

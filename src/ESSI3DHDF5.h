@@ -57,8 +57,8 @@ class ESSI3DHDF5 {
 
   void write_vel(void* window_array, int comp, int cycle, int nstep);
 
-  void init_write_vel(bool m_isRestart, int ntimestep, int ZFPmode,
-                      double ZFPpar, int dumpInterval);
+  void init_write_vel(bool m_isRestart, int ntimestep, int compressionMode,
+                      char* compressionPar, int dumpInterval);
 
   const std::string& filename() { return m_filename; };
   void set_ihavearray(bool ihavearray) { m_ihavearray = ihavearray; };

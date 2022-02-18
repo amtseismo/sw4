@@ -267,12 +267,6 @@ int main(int argc, char **argv) {
   H5Z_zfp_initialize();
 #endif
 
-#ifdef USE_SZ
-  char *cfgFile = getenv("SZ_CONFIG_FILE");
-  if (NULL == cfgFile) cfgFile = "sz.config";
-  H5Z_SZ_Init(cfgFile);
-#endif
-
 // make a new simulation object by reading the input file 'fileName'
 // nvtxRangePushA("outer");
 #if defined(SW4_EXCEPTIONS)

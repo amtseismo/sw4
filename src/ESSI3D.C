@@ -50,7 +50,7 @@ ESSI3D* ESSI3D::nil = static_cast<ESSI3D*>(0);
 //-----------------------------------------------------------------------
 ESSI3D::ESSI3D(EW* a_ew, const std::string& filePrefix, int dumpInterval,
                int bufferInterval, float_sw4 coordBox[6], float_sw4 depth,
-               int precision, int compressionMode, double compressionPar)
+               int precision, int compressionMode, char* compressionPar)
     : mEW(a_ew),
       mFilePrefix(filePrefix),
       mFileName(""),
@@ -371,14 +371,14 @@ void ESSI3D::open_vel_file(int a_cycle, std::string& a_path, float_sw4 a_time,
       m_hdf5helper->init_write_vel(m_isRestart, nstep, m_compressionMode,
                                    m_compressionPar, m_bufferInterval);
     else
-      m_hdf5helper->init_write_vel(m_isRestart, nstep, 0, 0.0,
+      m_hdf5helper->init_write_vel(m_isRestart, nstep, 0, (char*)"None",
                                    m_bufferInterval);
   } else {
     if (m_compressionMode > 0)
       m_hdf5helper->init_write_vel(m_isRestart, m_ntimestep, m_compressionMode,
                                    m_compressionPar, m_bufferInterval);
     else
-      m_hdf5helper->init_write_vel(m_isRestart, m_ntimestep, 0, 0.0,
+      m_hdf5helper->init_write_vel(m_isRestart, m_ntimestep, 0, (char*)"None",
                                    m_bufferInterval);
   }
 
