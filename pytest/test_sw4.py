@@ -122,6 +122,7 @@ def guess_mpi_cmd(mpi_tasks, omp_threads, cpu_allocation, verbose):
     if verbose: print('node_name=', node_name)
     sys_name = os.uname()[0]
     if verbose: print('sys_name=', sys_name)
+    nersc_sys = os.getenv('NERSC_HOST')
 
 
     if 'quartz' in node_name:
@@ -144,6 +145,9 @@ def guess_mpi_cmd(mpi_tasks, omp_threads, cpu_allocation, verbose):
         if mpi_tasks<=0: mpi_tasks = int(32/omp_threads) # for Haswell nodes
         sw_threads = omp_threads 
         mpirun_cmd="srun --cpu_bind=cores -n " + str(mpi_tasks) + " -c " + str(sw_threads)
+        # For Perlmutter
+        if nersc_sys == 'perlmutter':
+            mpirun_cmd="srun -N 1 -n 4 -c 32 --gpu-bind=single:1 --cpu-bind=cores  --gpus-per-task=1 "
     elif 'fourier' in node_name:
         if omp_threads<=0: omp_threads=1;
         if mpi_tasks<=0: mpi_tasks = 4
@@ -166,8 +170,9 @@ def guess_mpi_cmd(mpi_tasks, omp_threads, cpu_allocation, verbose):
         if mpi_tasks<=0: mpi_tasks = 4
         mpirun_cmd="srun -p amdMI100 -n1 "
     elif 'login' in node_name:
-        os.environ["PSM2_DEVICES"] = ""
-        os.environ["ROMIO_FSTYPE_FORCE"]="ufs:"
+        #os.environ["PSM2_DEVICES"] = ""
+        #os.environ["ROMIO_FSTYPE_FORCE"]="ufs:"
+        os.environ["MPICH_GPU_SUPPORT_ENABLED"]="1"
         if mpi_tasks<=0: mpi_tasks = 4
         mpirun_cmd="srun -N 1 -A GEO130_crusher -t 30 -n 8 -c8 --gpus-per-task=1 --gpu-bind=closest -p batch "
     elif 'lassen' in node_name:

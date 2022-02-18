@@ -229,7 +229,10 @@ void ESSI3D::update_image(int a_cycle, float_sw4 a_time, float_sw4 a_dt,
 
   write_image_hdf5(a_cycle, a_path, a_time, a_U);
 
+#ifndef USE_HDF5_ASYNC
+  // Close the file after each write when using async
   if (o_cycle == mNumberOfTimeSteps)  // last time step
+#endif
     close_vel_file();
 
   m_hdf5_time += (MPI_Wtime() - hdf5_time);

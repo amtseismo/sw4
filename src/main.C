@@ -60,6 +60,9 @@
 #include "H5Z_SZ.h"
 #endif
 
+#ifdef SW4_USE_SCR
+#include "scr.h"
+#endif
 #if defined(SW4_SIGNAL_CHECKPOINT)
 //
 // Currently no way to get the singnal to all processes without killing the job
@@ -101,6 +104,16 @@ int main(int argc, char **argv) {
   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 #else
   MPI_Init(&argc, &argv);
+#endif
+
+#ifdef SW4_USE_SCR
+  SCR_Configf("SCR_DEBUG=%d",1);
+  SCR_Configf("SCR_CACHE_SIZE=%d",2);
+  SCR_Configf("SCR_CACHE_BYPASS=%d",0); // Default 1 . 0 leaves everything in cache
+  SCR_Configf("SCR_FLUSH=%d",0);
+  SCR_Configf("SCR_FLUSH_ASYNC=%d",1);
+  SCR_Configf("SCR_FLUSH_TYPE=%s","PTHREAD");
+  SCR_Init();
 #endif
   MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
@@ -147,9 +160,10 @@ int main(int argc, char **argv) {
       global_variables.device);
 #endif
 
+  const int alignment = 512; // 1024 may be 1% faster on Crusher
   auto pooled_allocator =
-      rma.makeAllocator<umpire::strategy::DynamicPool, true>(
-          string("UM_pool"), pref_allocator, pool_size, 1024 * 1024, 512);
+      rma.makeAllocator<umpire::strategy::QuickPool, true>(
+          string("UM_pool"), pref_allocator, pool_size, 1024 * 1024, alignment);
 
   const size_t pool_size_small = static_cast<size_t>(250) * 1024 * 1024;
 
@@ -159,9 +173,9 @@ int main(int argc, char **argv) {
 
   // auto pooled_allocator_small =static_cast<size_t>(250)*1024*1024;
   auto pooled_allocator_small =
-      rma.makeAllocator<umpire::strategy::DynamicPool, true>(
+      rma.makeAllocator<umpire::strategy::QuickPool, true>(
           string("UM_pool_temps"), pref_allocator, pool_size_small, 1024 * 1024,
-          512);
+          alignment);
 
   const size_t object_pool_size = static_cast<size_t>(500) * 1024 * 1024;
 
@@ -169,7 +183,7 @@ int main(int argc, char **argv) {
   //					   object_pool_size,allocator);
 
   auto pooled_allocator_objects =
-      rma.makeAllocator<umpire::strategy::DynamicPool, false>(
+      rma.makeAllocator<umpire::strategy::QuickPool, false>(
           string("UM_object_pool"), allocator, object_pool_size);
 
 #ifdef SW4_MASS_PREFETCH
@@ -191,12 +205,12 @@ int main(int argc, char **argv) {
 
   // } else {
   //   auto pooled_allocator_small =
-  //     rma.makeAllocator<umpire::strategy::DynamicPool,true>(string("UM_pool_temps"),
+  //     rma.makeAllocator<umpire::strategy::QuickPool,true>(string("UM_pool_temps"),
   //  							   pref_allocator,pool_size_small);
   // }
 
   // auto pooled_allocator2 =
-  //   rma.makeAllocator<umpire::strategy::DynamicPool,false>(string("UM_pool_temps"),
+  //   rma.makeAllocator<umpire::strategy::QuickPool,false>(string("UM_pool_temps"),
   //                                                   allocator);
 #endif
 
@@ -226,6 +240,9 @@ int main(int argc, char **argv) {
     }
 #endif
     // Stop MPI
+#ifdef SW4_USE_SCR
+  SCR_Finalize();
+#endif
     MPI_Finalize();
     return 1;
   } else if (strcmp(argv[1], "-v") == 0) {
@@ -390,6 +407,11 @@ int main(int argc, char **argv) {
 
 #ifdef USE_SZ
   H5Z_SZ_Finalize();
+#endif
+
+#ifdef SW4_USE_SCR
+  // Flush any cached checkpoints to parallel file system
+  SCR_Finalize();
 #endif
 
   // Stop MPI
